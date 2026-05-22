@@ -1,14 +1,15 @@
 use axum::{
-    Json, Router,
     body::Body,
     extract::State,
     http::{HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     routing::post,
+    Json, Router,
 };
 use reqwest::Client;
 use serde_json::Value;
 use std::sync::Arc;
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tracing::{error, info};
 
 // ---------------------------------------------------------------------------
@@ -167,9 +168,22 @@ async fn main() {
         client: Client::new(),
     });
 
+    // CORS layer — allow only origins whose scheme is vscode-webview://,
+    // while permitting all methods and headers those clients may send.
+    let cors = CorsLayer::new()
+        .allow_origin(AllowOrigin::predicate(|origin: &HeaderValue, _| {
+            origin
+                .to_str()
+                .map(|o| o.starts_with("vscode-webview://"))
+                .unwrap_or(false)
+        }))
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     // Build the Axum router.
     let app = Router::new()
         .route("/v1/chat/completions", post(chat_completions))
+        .layer(cors)
         .with_state(state);
 
     let addr = format!("{host}:{port}");
