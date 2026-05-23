@@ -49,11 +49,19 @@ async fn chat_completions(
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
+    // Use the caller's Authorization header if provided; otherwise fall back
+    // to the internally configured FROG_API_KEY.
+    let auth_value = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_owned())
+        .unwrap_or_else(|| format!("Bearer {}", state.frog_api_key));
+
     // Build the upstream request.
     let mut req_builder = state
         .client
         .post(&upstream_url)
-        .header("Authorization", format!("Bearer {}", state.frog_api_key))
+        .header("Authorization", auth_value)
         .header("Content-Type", "application/json");
 
     // Forward Accept header if present (important for streaming SSE).
